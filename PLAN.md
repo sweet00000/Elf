@@ -55,8 +55,15 @@ that produce and consume `.elf` artifacts — self-contained portable knowledge 
 
 ## Status (today)
 
-- Phase 0 in progress (this commit lands the landing page + plans + repo init)
-- Phases 1–5 unstarted
+- Phase 0 — **shipped** (landing page + plans + repo init)
+- Phase 1 — **partial** (`pyproject.toml`, `foundry/{config,cli,judge/}` shipped; full builder commands stubbed)
+- Phase 2 — not started (Python re-impl of forge `buildSingle`)
+- Phase 3 — **partial** (LLM judge vs Wikipedia ground truth shipped; full rubric — Playwright probe queries, depth/size scoring — not yet)
+- Phases 4–5 — not started
+
+The Phase 3 judge ships ahead of the full Phase 2 builder because
+discriminating an arbitrary HTML/.elf candidate against Wikipedia is
+useful even without a custom builder behind it.
 
 ## Open work tracked in plans
 
