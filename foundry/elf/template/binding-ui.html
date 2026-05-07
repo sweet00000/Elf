@@ -1,0 +1,51 @@
+<div id="elf-app"></div>
+<style>
+  :root {
+    --elf-bg: #0b0d10;
+    --elf-panel: #111418;
+    --elf-edge: rgba(255,255,255,0.08);
+    --elf-text: #e6e8eb;
+    --elf-muted: #9aa0a6;
+    --elf-accent: #7c9cff;
+    --elf-user: #1f2937;
+    --elf-asst: #0f1923;
+  }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--elf-bg); color: var(--elf-text);
+    font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  #elf-app { display: flex; flex-direction: column; height: 100%; }
+  .elf-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--elf-edge);
+    background: var(--elf-panel);
+    display: flex; align-items: baseline; justify-content: space-between;
+  }
+  .elf-header h1 { font-size: 15px; font-weight: 600; margin: 0; }
+  .elf-fp { font-family: ui-monospace, monospace; font-size: 11px; color: var(--elf-muted); }
+  .elf-main { flex: 1; min-height: 0; display: grid; grid-template-rows: 1fr auto auto auto; padding: 16px; gap: 12px; max-width: 880px; width: 100%; box-sizing: border-box; margin: 0 auto; }
+  .elf-thread { overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; }
+  .elf-msg { padding: 10px 14px; border-radius: 8px; max-width: 88%; white-space: pre-wrap; }
+  .elf-user { background: var(--elf-user); align-self: flex-end; }
+  .elf-assistant { background: var(--elf-asst); align-self: flex-start; }
+  .elf-sources { font-size: 12px; color: var(--elf-muted); max-height: 28vh; overflow-y: auto; }
+  .elf-sources-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--elf-muted); margin-bottom: 6px; }
+  .elf-source { padding: 6px 8px; border-left: 2px solid var(--elf-accent); margin-bottom: 4px; background: rgba(255,255,255,0.02); }
+  .elf-score { display: inline-block; min-width: 3em; color: var(--elf-accent); font-family: ui-monospace, monospace; }
+  .elf-form { display: flex; gap: 8px; }
+  .elf-form input {
+    flex: 1; padding: 10px 12px; background: var(--elf-panel); color: var(--elf-text);
+    border: 1px solid var(--elf-edge); border-radius: 6px; font: inherit;
+  }
+  .elf-form button {
+    padding: 10px 16px; border: 1px solid var(--elf-edge); border-radius: 6px;
+    background: var(--elf-accent); color: white; font-weight: 600; cursor: pointer;
+  }
+  .elf-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .elf-log {
+    font-family: ui-monospace, monospace; font-size: 11px; color: var(--elf-muted);
+    background: var(--elf-panel); border: 1px solid var(--elf-edge); border-radius: 6px;
+    padding: 8px 10px; margin: 0; max-height: 14vh; overflow-y: auto; white-space: pre-wrap;
+  }
+</style>

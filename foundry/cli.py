@@ -16,6 +16,8 @@ from pathlib import Path
 import typer
 
 from .config import FoundryConfig
+from .elf import BuildError, InspectError, build_single, inspect
+from .elf.spec import Manifest
 from .judge.clients import make_judge
 from .judge.compare import compare_elf_against_wiki
 
@@ -105,6 +107,104 @@ def judge_wiki(
     typer.echo(text)
     if report.error:
         sys.exit(1)
+
+
+@app.command("inspect")
+def inspect_cmd(
+    path: Path = typer.Argument(..., help="Path to a .elf single-file HTML."),
+    pretty: bool = typer.Option(True, "--pretty/--no-pretty"),
+    out: Path | None = typer.Option(None, "--out", "-o"),
+) -> None:
+    """Parse a .elf, recompute fingerprint, verify each resource's sha256."""
+    try:
+        result = inspect(path)
+    except InspectError as e:
+        typer.secho(f"[foundry] inspect failed: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e
+
+    payload = result.to_dict()
+    text = json.dumps(payload, indent=2 if pretty else None, ensure_ascii=False)
+    if out:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+        typer.secho(f"[foundry] wrote {out}", fg=typer.colors.GREEN)
+    typer.echo(text)
+    if not result.ok:
+        raise typer.Exit(code=2)
+
+
+@app.command("build")
+def build_cmd(
+    manifest_path: Path = typer.Argument(
+        ...,
+        help="Path to a manifest JSON file (matches ELF v0.2 schema).",
+    ),
+    resources_dir: Path = typer.Option(
+        Path("."),
+        "--resources",
+        "-r",
+        help=(
+            "Directory containing resource bytes. Each manifest resource is "
+            "looked up at <resources>/<resource.path>, falling back to "
+            "<resources>/<resource.id>."
+        ),
+    ),
+    out: Path = typer.Option(
+        Path("output/build.elf.html"),
+        "--out",
+        "-o",
+        help="Where to write the built .elf.",
+    ),
+) -> None:
+    """Package a manifest + resource bytes into a single .elf HTML."""
+    try:
+        manifest_dict = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        typer.secho(f"[foundry] cannot read manifest: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e
+
+    try:
+        manifest = Manifest.model_validate(manifest_dict)
+    except Exception as e:
+        typer.secho(f"[foundry] manifest invalid: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e
+
+    resource_bytes: dict[str, bytes] = {}
+    for r in manifest.resources:
+        candidate = None
+        if r.path:
+            candidate = resources_dir / r.path
+            if not candidate.exists():
+                candidate = None
+        if candidate is None:
+            fallback = resources_dir / r.id
+            if fallback.exists():
+                candidate = fallback
+        if candidate is None:
+            if r.fetch_urls:
+                continue  # reference-only allowed
+            typer.secho(
+                f"[foundry] resource {r.id!r}: bytes not found "
+                f"(checked path={r.path!r}, id-fallback={r.id})",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        resource_bytes[r.id] = candidate.read_bytes()
+
+    try:
+        result = build_single(manifest, resource_bytes)
+    except BuildError as e:
+        typer.secho(f"[foundry] build failed:\n{e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e
+
+    result.write(out)
+    typer.secho(
+        f"[foundry] built {out} ({result.byte_size} bytes, "
+        f"fingerprint sha256:{result.fingerprint})",
+        fg=typer.colors.GREEN,
+    )
+    typer.echo(json.dumps(result.summary(), indent=2))
 
 
 @app.command("providers")

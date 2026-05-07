@@ -1,0 +1,23 @@
+{
+  "elf_version": "0.2",
+  "id": "urn:uuid:foundry-demo-0001",
+  "title": "Foundry Demo ELF",
+  "description": "Smallest possible .elf produced by foundry build for the round-trip demo.",
+  "created": "2026-05-07T00:00:00Z",
+  "resources": [
+    {
+      "id": "res:doc.hello",
+      "media_type": "text/plain",
+      "size": 12,
+      "sha256": "c0535e4be2b79ffd93291305436bf889314e4a3faec05ecffcbb7df31ad9e51a",
+      "role": "document",
+      "behavioral": false,
+      "canonical_content": true,
+      "path": "doc-hello.txt"
+    }
+  ],
+  "interaction": { "kind": "chat", "operations": ["generate-text"] },
+  "fulfillments": {
+    "generate-text": [{ "id": "host", "kind": "host-capability" }]
+  }
+}

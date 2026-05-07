@@ -20,6 +20,11 @@ output/
 .env.local
 *.pem
 
+# Local notes / scratch (transcripts, drafts dropped at root)
+New Text Document*.txt
+WEBSITE_PLAN (*).md
+*.scratch.md
+
 # OS / editor
 .DS_Store
 Thumbs.db
