@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELF — Embedded Language Format</title>
+<meta name="description" content="A family of browser-native, offline-first AI tools producing and consuming portable .elf knowledge artifacts.">
+<style>
+:root {
+  --bg:          #0d0e0f;
+  --bg-soft:     #111315;
+  --bg-card:     #161819;
+  --bg-card2:    #1c1f21;
+  --border:      #252829;
+  --border-soft: #1a1d1f;
+  --ink:         #e8e6df;
+  --ink-soft:    #9a9890;
+  --ink-faint:   #5a5855;
+
+  /* per-product accents */
+  --accent:        #ff6b3d;   /* Forge */
+  --accent2:       #ff8c66;
+  --teal:          #5fcfb8;   /* NotebookELF */
+  --teal-dim:      #3a8a78;
+  --warn:          #f0c674;   /* Codelves */
+  --sky:           #7fb8e6;   /* Webelves */
+  --rose:          #e87a8a;   /* Foundry (paid) */
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'IBM Plex Mono','JetBrains Mono','Cascadia Code','Consolas',monospace;
+  font-size:14px;
+  line-height:1.6;
+  min-height:100vh;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 80% 0%, #ff6b3d0a 0%, transparent 60%),
+    radial-gradient(ellipse 40% 60% at 10% 80%, #5fcfb808 0%, transparent 50%);
+}
+body::before{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent 0,transparent 3px,rgba(255,255,255,0.008) 3px,rgba(255,255,255,0.008) 4px);
+  pointer-events:none;z-index:0;
+}
+
+/* ── NAV ─────────────────────────────────────────── */
+nav{
+  position:fixed;top:0;left:0;right:0;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;
+  height:56px;
+  background:rgba(10,11,12,0.88);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+  z-index:100;
+  gap:20px;
+}
+.nav-logo{
+  display:flex;align-items:baseline;gap:10px;
+  font-size:13px;
+  cursor:default;
+  user-select:none;
+  flex-shrink:0;
+}
+.nav-logo-mark{
+  font-size:15px;font-weight:700;
+  color:var(--accent);
+  letter-spacing:-.01em;
+}
+.nav-logo-text{
+  color:var(--ink-faint);
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.18em;
+}
+.nav-tabs{
+  display:flex;gap:2px;
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:3px;
+  flex-wrap:wrap;
+  overflow:hidden;
+}
+.tab-btn{
+  background:none;border:none;
+  color:var(--ink-faint);
+  font-family:inherit;font-size:11px;
+  font-weight:700;text-transform:uppercase;letter-spacing:.12em;
+  padding:6px 12px;border-radius:4px;
+  cursor:pointer;
+  transition:all .2s ease;
+  white-space:nowrap;
+}
+.tab-btn:not(.active):hover{color:var(--ink);}
+.tab-btn.active[data-accent="ink"]   {background:var(--ink);     color:var(--bg);}
+.tab-btn.active[data-accent="accent"]{background:var(--accent);  color:#000;}
+.tab-btn.active[data-accent="teal"]  {background:var(--teal);    color:#000;}
+.tab-btn.active[data-accent="warn"]  {background:var(--warn);    color:#000;}
+.tab-btn.active[data-accent="sky"]   {background:var(--sky);     color:#000;}
+.tab-btn.active[data-accent="rose"]  {background:var(--rose);    color:#000;}
+
+@media(max-width:760px){
+  nav{padding:0 16px;flex-wrap:wrap;height:auto;padding-top:10px;padding-bottom:10px;gap:10px;}
+  .nav-tabs{width:100%;justify-content:flex-start;}
+  .tab-btn{padding:6px 10px;font-size:10px;}
+}
+
+/* ── HERO ─────────────────────────────────────────── */
+.hero{
+  padding:140px 40px 60px;
+  max-width:960px;
+  margin:0 auto;
+  position:relative;z-index:1;
+}
+@media(max-width:760px){.hero{padding:160px 20px 40px;}}
+.hero-eyebrow{
+  font-size:11px;color:var(--teal);
+  text-transform:uppercase;letter-spacing:.2em;
+  margin-bottom:20px;
+  display:flex;align-items:center;gap:10px;
+}
+.hero-eyebrow::before{content:'';display:block;width:24px;height:1px;background:var(--teal);}
+h1{
+  font-family:'IBM Plex Serif','Georgia','Times New Roman',serif;
+  font-size:clamp(30px,5vw,56px);
+  font-weight:600;
+  line-height:1.1;
+  letter-spacing:-.02em;
+  margin-bottom:24px;
+  color:var(--ink);
+}
+h1 em{color:var(--accent);font-style:italic;font-weight:400;}
+h1 .h1-teal{color:var(--teal);font-style:italic;font-weight:400;}
+.hero-sub{
+  font-size:15px;color:var(--ink-soft);
+  max-width:600px;
+  margin-bottom:36px;
+  line-height:1.65;
+}
+.hero-ctas{
+  display:flex;gap:12px;flex-wrap:wrap;
+  margin-bottom:36px;
+}
+.btn-primary, .btn-ghost, .btn-paid{
+  border:none;padding:11px 22px;border-radius:4px;
+  font-family:inherit;font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.12em;
+  cursor:pointer;
+  transition:all .2s ease;
+  text-decoration:none;display:inline-block;
+}
+.btn-primary{background:var(--accent);color:#000;}
+.btn-primary:hover{background:var(--accent2);transform:translateY(-1px);}
+.btn-ghost{background:none;border:1px solid var(--border);color:var(--ink-soft);}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.btn-paid{background:var(--rose);color:#000;}
+.btn-paid:hover{filter:brightness(1.1);}
+.btn-disabled{
+  background:var(--bg-card);color:var(--ink-faint);
+  border:1px dashed var(--border);
+  cursor:not-allowed;
+  padding:11px 22px;border-radius:4px;
+  font-family:inherit;font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.12em;
+}
+
+/* ── TAB CONTENT ──────────────────────────────────── */
+.tab-content{display:none;position:relative;z-index:1;}
+.tab-content.active{display:block;animation:fadein .3s ease;}
+@keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+/* ── SECTION ──────────────────────────────────────── */
+section{max-width:960px;margin:0 auto;padding:48px 40px;}
+section+section{padding-top:0;}
+@media(max-width:760px){section{padding:36px 20px;}}
+
+.section-label{
+  font-size:10px;color:var(--ink-faint);
+  text-transform:uppercase;letter-spacing:.2em;
+  margin-bottom:16px;display:flex;align-items:center;gap:10px;
+}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+h2{
+  font-family:'IBM Plex Serif','Georgia',serif;
+  font-size:28px;font-weight:600;
+  letter-spacing:-.01em;margin-bottom:12px;
+}
+h2 .h2-acc{color:var(--accent);}
+h2 .h2-teal{color:var(--teal);}
+h2 .h2-warn{color:var(--warn);}
+h2 .h2-sky {color:var(--sky);}
+h2 .h2-rose{color:var(--rose);}
+
+p.lede{color:var(--ink-soft);max-width:640px;margin-bottom:0;}
+
+/* ── PRODUCT GRID (overview tab) ──────────────────── */
+.product-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:1px;
+  background:var(--border);
+  border:1px solid var(--border);
+  border-radius:6px;
+  overflow:hidden;
+  margin-top:32px;
+}
+.product-card{
+  background:var(--bg-card);
+  padding:24px 22px;
+  cursor:pointer;
+  transition:background .2s ease;
+  display:flex;flex-direction:column;gap:10px;
+}
+.product-card:hover{background:var(--bg-card2);}
+.product-card-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
+.product-card-name{font-size:15px;font-weight:700;letter-spacing:-.01em;}
+.product-card-status{font-size:9px;text-transform:uppercase;letter-spacing:.18em;color:var(--ink-faint);}
+.product-card-tagline{font-size:12px;color:var(--ink-soft);line-height:1.55;}
+.product-card-cta{
+  margin-top:auto;font-size:10px;text-transform:uppercase;letter-spacing:.15em;
+  color:var(--ink-faint);
+  display:flex;align-items:center;gap:6px;
+}
+.product-card[data-accent="accent"] .product-card-name{color:var(--accent);}
+.product-card[data-accent="teal"]   .product-card-name{color:var(--teal);}
+.product-card[data-accent="warn"]   .product-card-name{color:var(--warn);}
+.product-card[data-accent="sky"]    .product-card-name{color:var(--sky);}
+.product-card[data-accent="rose"]   .product-card-name{color:var(--rose);}
+
+/* ── FEATURE CARDS (cards) ────────────────────────── */
+.cards{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:1px;
+  background:var(--border);
+  border:1px solid var(--border);
+  border-radius:6px;
+  overflow:hidden;
+  margin-top:24px;
+}
+.card{
+  background:var(--bg-card);
+  padding:22px 20px;
+  transition:background .2s ease;
+}
+.card:hover{background:var(--bg-card2);}
+.card-num{
+  font-size:10px;color:var(--accent);
+  font-weight:700;letter-spacing:.18em;
+  text-transform:uppercase;margin-bottom:10px;
+}
+.card-num.teal{color:var(--teal);}
+.card-num.warn{color:var(--warn);}
+.card-num.sky {color:var(--sky);}
+.card-num.rose{color:var(--rose);}
+.card-title{font-size:14px;font-weight:600;margin-bottom:6px;color:var(--ink);}
+.card-desc{font-size:12px;color:var(--ink-soft);line-height:1.55;}
+
+/* ── TERMINAL ─────────────────────────────────────── */
+.terminal{
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:14px 18px;
+  font-size:12px;
+  color:var(--ink);
+  max-width:560px;
+  position:relative;
+  overflow:hidden;
+  margin-top:18px;
+}
+.terminal::before{
+  content:'● ● ●';
+  font-size:9px;color:var(--ink-faint);
+  display:block;margin-bottom:8px;letter-spacing:4px;
+}
+.t-comment{color:var(--ink-faint);}
+.t-cmd{color:var(--teal);}
+.t-arg{color:var(--accent);}
+.t-out{color:var(--ink-soft);}
+.t-ok{color:var(--teal);}
+
+/* ── PLAN SECTION (collapsible) ───────────────────── */
+.plan-block{
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:6px;
+  margin-top:24px;
+  overflow:hidden;
+}
+.plan-block summary{
+  cursor:pointer;
+  padding:16px 22px;
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;
+  color:var(--ink-soft);
+  list-style:none;
+  display:flex;align-items:center;justify-content:space-between;
+  user-select:none;
+}
+.plan-block summary::-webkit-details-marker{display:none;}
+.plan-block summary::after{content:'▾';color:var(--ink-faint);transition:transform .2s ease;}
+.plan-block[open] summary::after{transform:rotate(180deg);}
+.plan-block summary:hover{color:var(--ink);}
+.plan-content{
+  padding:0 22px 22px;
+  font-size:13px;color:var(--ink-soft);line-height:1.7;
+  border-top:1px solid var(--border-soft);
+  padding-top:18px;
+}
+.plan-content h4{
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;
+  color:var(--ink);margin:18px 0 8px;
+}
+.plan-content h4:first-child{margin-top:0;}
+.plan-content ul{padding-left:20px;margin-bottom:12px;}
+.plan-content li{margin-bottom:4px;}
+.plan-content code{
+  background:var(--bg);border:1px solid var(--border);
+  padding:1px 6px;border-radius:3px;font-size:11px;color:var(--teal);
+}
+.plan-link{
+  display:inline-block;margin-top:12px;
+  font-size:10px;text-transform:uppercase;letter-spacing:.15em;
+  color:var(--ink-faint);text-decoration:none;
+  border-bottom:1px solid var(--ink-faint);
+  padding-bottom:2px;
+}
+.plan-link:hover{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* ── PHASE TABLE ──────────────────────────────────── */
+.phase-table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:18px;
+  font-size:12px;
+}
+.phase-table th,.phase-table td{
+  text-align:left;padding:10px 12px;
+  border-bottom:1px solid var(--border-soft);
+}
+.phase-table th{
+  font-size:10px;text-transform:uppercase;letter-spacing:.15em;
+  color:var(--ink-faint);font-weight:700;
+}
+.phase-table td.phase-num{color:var(--accent);font-weight:700;width:10%;}
+.phase-table td{color:var(--ink-soft);}
+.phase-table .status-done{color:var(--teal);}
+.phase-table .status-progress{color:var(--warn);}
+.phase-table .status-todo{color:var(--ink-faint);}
+
+/* ── PIPELINE DIAGRAM ─────────────────────────────── */
+.pipeline{font-size:12px;color:var(--ink-soft);margin-top:24px;}
+.pipe-row{display:flex;align-items:center;gap:0;flex-wrap:wrap;margin-bottom:8px;}
+.pipe-node{
+  background:var(--bg-card2);border:1px solid var(--border);
+  padding:6px 12px;border-radius:4px;
+  font-size:11px;color:var(--ink);
+  white-space:nowrap;
+}
+.pipe-arr{color:var(--ink-faint);padding:0 6px;font-size:12px;}
+.pipe-node.in {border-color:var(--accent);color:var(--accent);}
+.pipe-node.disc{border-color:var(--rose);color:var(--rose);}
+.pipe-node.out{border-color:var(--teal);color:var(--teal);}
+
+/* ── DOWNLOAD ROW ─────────────────────────────────── */
+.dl-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px;}
+.dl-btn{
+  display:flex;align-items:center;gap:8px;
+  background:var(--bg-card);border:1px solid var(--border);
+  color:var(--ink-soft);padding:10px 16px;border-radius:4px;
+  font-family:inherit;font-size:12px;cursor:pointer;
+  text-decoration:none;
+  transition:all .2s ease;
+}
+.dl-btn:hover{border-color:var(--accent);color:var(--ink);}
+.dl-icon{color:var(--accent);font-size:14px;}
+
+/* ── KEY INPUT (foundry tab) ──────────────────────── */
+.key-input{
+  margin-top:32px;
+  padding:24px;
+  background:var(--bg-card);border:1px dashed var(--rose);
+  border-radius:6px;
+  max-width:540px;
+}
+.key-input-label{
+  font-size:10px;color:var(--rose);
+  text-transform:uppercase;letter-spacing:.18em;
+  margin-bottom:8px;
+}
+.key-input h3{
+  font-family:'IBM Plex Serif','Georgia',serif;
+  font-size:16px;margin-bottom:8px;font-weight:600;
+}
+.key-input p{font-size:12px;color:var(--ink-soft);margin-bottom:14px;}
+.key-input-row{display:flex;gap:8px;}
+.key-input input{
+  flex:1;
+  background:var(--bg);border:1px solid var(--border);
+  color:var(--ink);padding:10px 12px;border-radius:4px;
+  font-family:inherit;font-size:12px;outline:none;
+}
+.key-input input:focus{border-color:var(--rose);}
+.key-input-note{font-size:10px;color:var(--ink-faint);margin-top:10px;}
+
+/* ── WAITLIST ─────────────────────────────────────── */
+.waitlist{
+  margin-top:32px;
+  padding:28px;
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:6px;
+  max-width:540px;
+}
+.waitlist-label{font-size:10px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.18em;margin-bottom:8px;}
+.waitlist h3{font-family:'IBM Plex Serif','Georgia',serif;font-size:18px;margin-bottom:14px;}
+.waitlist-row{display:flex;gap:8px;}
+.waitlist input{
+  flex:1;
+  background:var(--bg);border:1px solid var(--border);
+  color:var(--ink);padding:10px 12px;border-radius:4px;
+  font-family:inherit;font-size:12px;outline:none;
+}
+.waitlist input:focus{border-color:var(--rose);}
+.waitlist-note{font-size:10px;color:var(--ink-faint);margin-top:10px;}
+
+/* ── TOAST ────────────────────────────────────────── */
+.toast{
+  position:fixed;
+  bottom:24px;right:24px;
+  background:var(--bg-card);border:1px solid var(--teal);
+  color:var(--ink);
+  padding:12px 18px;border-radius:4px;
+  font-size:12px;
+  z-index:200;
+  opacity:0;transform:translateY(8px);
+  transition:opacity .25s ease, transform .25s ease;
+  pointer-events:none;
+}
+.toast.show{opacity:1;transform:translateY(0);}
+
+/* ── FOOTER ───────────────────────────────────────── */
+footer{
+  border-top:1px solid var(--border);
+  padding:24px 32px;margin-top:60px;
+  display:flex;flex-wrap:wrap;gap:16px;
+  align-items:center;justify-content:space-between;
+  font-size:11px;color:var(--ink-faint);
+  position:relative;z-index:1;
+}
+footer a{color:var(--teal);text-decoration:none;}
+footer a:hover{text-decoration:underline;}
+.footer-logo{color:var(--accent);font-weight:700;}
+
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<!-- ════ NAV ════ -->
+<nav>
+  <div class="nav-logo">
+    <span class="nav-logo-mark">// elf</span>
+    <span class="nav-logo-text">Embedded Language Format</span>
+  </div>
+  <div class="nav-tabs">
+    <button class="tab-btn active" data-tab="overview"    data-accent="ink">Overview</button>
+    <button class="tab-btn"        data-tab="forge"       data-accent="accent">Forge</button>
+    <button class="tab-btn"        data-tab="notebookelf" data-accent="teal">NotebookELF</button>
+    <button class="tab-btn"        data-tab="codelves"    data-accent="warn">Codelves</button>
+    <button class="tab-btn"        data-tab="webelves"    data-accent="sky">Webelves</button>
+    <button class="tab-btn"        data-tab="foundry"     data-accent="rose">Foundry</button>
+  </div>
+</nav>
+
+<!-- ════ HERO (always visible) ════ -->
+<div class="hero">
+  <div class="hero-eyebrow">v0 — open spec · offline-first</div>
+  <h1>Knowledge, embedded.<br><em>Runs anywhere.</em><br><span class="h1-teal">No internet required.</span></h1>
+  <p class="hero-sub">ELF is a family of browser-native, offline-first AI tools that produce and consume <code style="color:var(--teal);">.elf</code> artifacts — self-contained portable knowledge files bundling a model, a corpus, and a UI together.</p>
+  <div class="hero-ctas">
+    <a href="#" class="btn-primary" onclick="switchTab('overview');return false;">Tour the products →</a>
+    <a href="plans/foundry.md" class="btn-ghost" target="_blank" rel="noopener">Read the plan ↗</a>
+  </div>
+</div>
+
+<!-- ════ OVERVIEW TAB ════ -->
+<div class="tab-content active" id="tab-overview">
+  <section>
+    <div class="section-label">The family</div>
+    <h2>Five products. <span class="h2-teal">One format.</span></h2>
+    <p class="lede">Every tool here produces or consumes the same <code style="color:var(--teal);">.elf</code> file: a portable, self-contained knowledge bundle that opens in any modern browser with zero setup. Click any card to dive in.</p>
+
+    <div class="product-grid">
+      <div class="product-card" data-accent="accent" onclick="switchTab('forge')">
+        <div class="product-card-head">
+          <div class="product-card-name">Forge</div>
+          <div class="product-card-status">M0+M1</div>
+        </div>
+        <div class="product-card-tagline">Browser builder for <code style="color:var(--teal);">.elf</code>. Solid + Vite + Tailwind. Three-column workspace where users (or agents) assemble portable knowledge bundles from sources.</div>
+        <div class="product-card-cta">Open Forge →</div>
+      </div>
+
+      <div class="product-card" data-accent="teal" onclick="switchTab('notebookelf')">
+        <div class="product-card-head">
+          <div class="product-card-name">NotebookELF</div>
+          <div class="product-card-status">Phase 1</div>
+        </div>
+        <div class="product-card-tagline">NotebookLM-style multi-notebook shell over Forge. Sources + grounded chat with citations + studio for notes. Build → portable <code style="color:var(--teal);">.elf</code>.</div>
+        <div class="product-card-cta">Open NotebookELF →</div>
+      </div>
+
+      <div class="product-card" data-accent="warn" onclick="switchTab('codelves')">
+        <div class="product-card-head">
+          <div class="product-card-name">Codelves</div>
+          <div class="product-card-status">v2 shipped</div>
+        </div>
+        <div class="product-card-tagline">Browser-native AgentOS IDE. Many agents collaborate over TXT-first threads. Pyodide runtime, OPFS storage, multi-instance namespaces.</div>
+        <div class="product-card-cta">Open Codelves →</div>
+      </div>
+
+      <div class="product-card" data-accent="sky" onclick="switchTab('webelves')">
+        <div class="product-card-head">
+          <div class="product-card-name">Webelves</div>
+          <div class="product-card-status">v1 shipped</div>
+        </div>
+        <div class="product-card-tagline">Perplexity-style local search. wllama (GGUF in WASM) + MiniLM embeddings + SearXNG adapter. QAi reads the web, grounds answers, cites sources inline.</div>
+        <div class="product-card-cta">Open Webelves →</div>
+      </div>
+
+      <div class="product-card" data-accent="rose" onclick="switchTab('foundry')">
+        <div class="product-card-head">
+          <div class="product-card-name">Foundry</div>
+          <div class="product-card-status">Phase 0 — Paid</div>
+        </div>
+        <div class="product-card-tagline">Python GAN that bootstraps the wiki brain. Generator emits <code style="color:var(--teal);">.elf</code> candidates, discriminator scores them, accepted artifacts feed a fine-tune corpus.</div>
+        <div class="product-card-cta">Open Foundry →</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">The format</div>
+    <h2>What's in a <span class="h2-acc">.elf</span></h2>
+    <p class="lede">An <code style="color:var(--teal);">.elf</code> is a single portable file (HTML in v0.2, ZIP in v1.0) bundling everything a reader needs to open, browse, and chat with a knowledge base — entirely offline.</p>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-num">[01]</div>
+        <div class="card-title">Manifest</div>
+        <div class="card-desc">RFC 8785 JCS-canonical JSON. SHA-256 over the manifest = the artifact's identity. Lists every resource inside, signed or unsigned.</div>
+      </div>
+      <div class="card">
+        <div class="card-num teal">[02]</div>
+        <div class="card-title">Corpus</div>
+        <div class="card-desc">Articles + chunks. Embeddings precomputed. Sources preserved with provenance so the assistant can cite line spans back to originals.</div>
+      </div>
+      <div class="card">
+        <div class="card-num warn">[03]</div>
+        <div class="card-title">Runtime</div>
+        <div class="card-desc">A wllama (GGUF) or transformers.js (ONNX) bootstrap inlined into the file. Boots a chat UI when opened. No installation, no server.</div>
+      </div>
+      <div class="card">
+        <div class="card-num sky">[04]</div>
+        <div class="card-title">Optional model</div>
+        <div class="card-desc">A small LLM (~200MB–1GB) baked in for full offline use, or fetched lazily from a CDN for slim "lite" artifacts. Same runtime either way.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">Hard commitments</div>
+    <h2>What we won't compromise on.</h2>
+    <ul style="list-style:none;padding:0;margin-top:18px;">
+      <li style="padding:10px 0;border-bottom:1px solid var(--border-soft);font-size:13px;color:var(--ink-soft);"><span style="color:var(--accent);font-weight:700;">[01]</span> &nbsp; Browser-only at the consumer edge. Open an <code style="color:var(--teal);">.elf</code> in any modern browser. No installation, no server, no telemetry.</li>
+      <li style="padding:10px 0;border-bottom:1px solid var(--border-soft);font-size:13px;color:var(--ink-soft);"><span style="color:var(--teal);font-weight:700;">[02]</span> &nbsp; Offline-first. External calls gated by an explicit API key. Absence ⇒ local fallback. Never crash for missing keys.</li>
+      <li style="padding:10px 0;border-bottom:1px solid var(--border-soft);font-size:13px;color:var(--ink-soft);"><span style="color:var(--warn);font-weight:700;">[03]</span> &nbsp; Manifest is identity. SHA-256 of the canonicalized manifest is the artifact's fingerprint. Same fingerprint ⇒ same artifact, byte for byte.</li>
+      <li style="padding:10px 0;border-bottom:1px solid var(--border-soft);font-size:13px;color:var(--ink-soft);"><span style="color:var(--sky);font-weight:700;">[04]</span> &nbsp; Citations are structured. Every grounded answer carries machine-readable citation spans, not regex over freeform prose.</li>
+      <li style="padding:10px 0;font-size:13px;color:var(--ink-soft);"><span style="color:var(--rose);font-weight:700;">[05]</span> &nbsp; Foundry is Python only. No Node deps in the synth pipeline. Forge/NotebookELF/Webelves stay browser-native.</li>
+    </ul>
+  </section>
+</div>
+
+<!-- ════ FORGE TAB ════ -->
+<div class="tab-content" id="tab-forge">
+  <section>
+    <div class="section-label">Forge — `.elf` Builder</div>
+    <h2>Build <span class="h2-acc">.elf</span> in the browser.</h2>
+    <p class="lede">Forge is a browser-only Solid app where a user — or an agent the user is chatting with — assembles a portable <code style="color:var(--teal);">.elf</code> from sources, embeddings, runtime templates, and an interaction contract. Output is one self-contained HTML file that runs offline anywhere.</p>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-num">[01]</div>
+        <div class="card-title">Three-column workspace</div>
+        <div class="card-desc">Sources / pipeline / outputs on the left. Toolbar + chat in the middle. Sandboxed iframe preview on the right — same code path consumers run.</div>
+      </div>
+      <div class="card">
+        <div class="card-num">[02]</div>
+        <div class="card-title">Manifest is truth</div>
+        <div class="card-desc"><code>manifest$</code> + <code>resources$</code> + <code>blobs</code> are the source of truth. Everything else derives. Identity = JCS canonical SHA-256, live in the toolbar.</div>
+      </div>
+      <div class="card">
+        <div class="card-num">[03]</div>
+        <div class="card-title">Two runtimes ship</div>
+        <div class="card-desc"><code>runtime-transformers-onnx.js</code> for Xenova ONNX models. <code>runtime-wllama-gguf.js</code> for GGUF via WASM. Static templates copied into every output.</div>
+      </div>
+    </div>
+
+    <details class="plan-block">
+      <summary>The plan — Forge M0 → M2</summary>
+      <div class="plan-content">
+        <h4>Architectural commitments</h4>
+        <ul>
+          <li>Solid + Vite + Tailwind. No React. Solid signals = state primitive.</li>
+          <li>Browser-only. No server. OPFS = filesystem. Workers do heavy work.</li>
+          <li>Tools = typed functions; both UI and agent call the same surface.</li>
+          <li>Identity = RFC 8785 JCS canonical SHA-256 over manifest with <code>signatures: []</code>.</li>
+          <li>Preview = sandboxed iframe loading the actual built <code>.elf</code> blob.</li>
+          <li>One <code>AgentClient</code> interface, MVP impl <code>GeminiAgentClient</code>. Local-model impl later.</li>
+        </ul>
+        <h4>ELF v0.2 manifest</h4>
+        <ul>
+          <li><code>elf_version: "0.2"</code>, <code>id</code>, <code>title</code>, <code>created</code></li>
+          <li><code>resources[]</code> with <code>{id, media_type, sha256, role, derived_from[]}</code></li>
+          <li><code>interaction: {kind, operations[]}</code> + <code>fulfillments: {op: [resource_id]}</code></li>
+          <li><code>signatures[]</code> + <code>provenance</code></li>
+        </ul>
+        <h4>Status</h4>
+        <ul>
+          <li>M0 (skeleton) — <span style="color:var(--teal);">shipped</span></li>
+          <li>M1 (manual happy path) — <span style="color:var(--teal);">shipped</span></li>
+          <li>M2 (agent loop) — deferred, folded into NotebookELF Phase 3</li>
+        </ul>
+        <a href="plans/forge.md" class="plan-link" target="_blank" rel="noopener">Read full plan →</a>
+      </div>
+    </details>
+  </section>
+</div>
+
+<!-- ════ NOTEBOOKELF TAB ════ -->
+<div class="tab-content" id="tab-notebookelf">
+  <section>
+    <div class="section-label">NotebookELF — Multi-notebook shell</div>
+    <h2>NotebookLM-style. <span class="h2-teal">Builds .elf.</span></h2>
+    <p class="lede">A browser studio for producing <code style="color:var(--teal);">.elf</code> "embeddable teachers." Dashboard of notebook cards. Each notebook holds sources, an auto-generated identity, a grounded RAG chat with inline citations, and a studio for notes. Hit <strong>Build</strong> and the whole teacher packages into one portable file — same chat UX baked in.</p>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-num teal">[01]</div>
+        <div class="card-title">Three-panel notebook</div>
+        <div class="card-desc">Sources (left) — what the teacher knows. Chat (center) — ask, teacher cites. Studio (right) — your notes, build-time only.</div>
+      </div>
+      <div class="card">
+        <div class="card-num teal">[02]</div>
+        <div class="card-title">Citations are structured</div>
+        <div class="card-desc">Gemini <code>responseSchema</code> forces <code>{output: [{text, citations: [...]}]}</code>. No regex over freeform output. Same shape the <code>.elf</code> runtime emits.</div>
+      </div>
+      <div class="card">
+        <div class="card-num teal">[03]</div>
+        <div class="card-title">Out-of-band presentation</div>
+        <div class="card-desc">Icon, color, example questions live in <code>notebookMeta</code>, not in the manifest. Changing the icon doesn't change the artifact fingerprint.</div>
+      </div>
+    </div>
+
+    <details class="plan-block">
+      <summary>The plan — Phases 1–6</summary>
+      <div class="plan-content">
+        <h4>OPFS layout</h4>
+        <ul>
+          <li><code>/notebooks/index.json</code> — dashboard summaries</li>
+          <li><code>/notebooks/&lt;id&gt;/workspace.json</code> — per-notebook snapshot (workspace + meta + chats + notes)</li>
+          <li><code>/notebooks/&lt;id&gt;/blobs/&lt;sha[0:2]&gt;/&lt;sha&gt;</code> — content-addressed</li>
+          <li><code>/notebooks/&lt;id&gt;/outputs/&lt;buildId&gt;.elf.html</code> — built artifacts</li>
+        </ul>
+        <h4>Phases</h4>
+        <table class="phase-table">
+          <tr><th>Phase</th><th>Goal</th><th>Status</th></tr>
+          <tr><td class="phase-num">1</td><td>Notebook layer (dashboard + per-notebook workspace + migration)</td><td class="status-progress">scaffolded</td></tr>
+          <tr><td class="phase-num">2</td><td>Sources ingest UX (file / paste / URL dialog, status badges)</td><td class="status-progress">partial</td></tr>
+          <tr><td class="phase-num">3</td><td>Auto-generate notebook details (Gemini structured output)</td><td class="status-todo">not started</td></tr>
+          <tr><td class="phase-num">4</td><td>Chat loop with structured citations</td><td class="status-todo">not started</td></tr>
+          <tr><td class="phase-num">5</td><td>Studio (notes panel)</td><td class="status-todo">not started</td></tr>
+          <tr><td class="phase-num">6</td><td><code>.elf</code> runtime upgrade (citations, source viewer)</td><td class="status-todo">not started</td></tr>
+        </table>
+        <a href="plans/notebookelf.md" class="plan-link" target="_blank" rel="noopener">Read full plan →</a>
+      </div>
+    </details>
+  </section>
+</div>
+
+<!-- ════ CODELVES TAB ════ -->
+<div class="tab-content" id="tab-codelves">
+  <section>
+    <div class="section-label">Codelves — AgentOS IDE</div>
+    <h2>Many agents, <span class="h2-warn">one workspace.</span></h2>
+    <p class="lede">Codelves is a browser-native, local-first multi-agent workspace. TXT-first threads as durable human-readable truth. One kernel worker, one shared Pyodide worker, many agent workers. Real Python in a tab.</p>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-num warn">[01]</div>
+        <div class="card-title">Mode 1 — Recursive spawning</div>
+        <div class="card-desc">One app instance, many agents. Many thread files. Many child agent windows. Multiplied resource = agents, not app instances. v2 core, shipped.</div>
+      </div>
+      <div class="card">
+        <div class="card-num warn">[02]</div>
+        <div class="card-title">Mode 2 — Nested child shell</div>
+        <div class="card-desc">Generated child copy of Codelves launches in a preview pane. Separate identity + storage namespace. May be preview-only. v2.1 target.</div>
+      </div>
+      <div class="card">
+        <div class="card-num warn">[03]</div>
+        <div class="card-title">Mode 3 — Isolated runtime</div>
+        <div class="card-desc">Nested child becomes a real runtime: own kernel, agent workers, Pyodide, threads, workspace. Bounded by outer-system policy.</div>
+      </div>
+      <div class="card">
+        <div class="card-num warn">[04]</div>
+        <div class="card-title">Mode 4 — Bot factory</div>
+        <div class="card-desc">Outer app spawns specialized child runtime configured for a user task, optionally with a local model stack. Roadmap; shape in v2.1, impl later.</div>
+      </div>
+    </div>
+
+    <details class="plan-block">
+      <summary>The plan — v2.1</summary>
+      <div class="plan-content">
+        <h4>Namespace model</h4>
+        <ul>
+          <li>Every app instance has a namespace id: <code>main</code>, <code>child-001..N</code>, <code>bot-001..N</code></li>
+          <li>Every durable path / worker graph / runtime resource belongs to an instance namespace</li>
+          <li>Prevents IndexedDB + OPFS + worker collisions across nested instances</li>
+        </ul>
+        <h4>Shipped features</h4>
+        <ul>
+          <li>File explorer with drag-to-resize panel</li>
+          <li>Code editor + Browser Preview tabs</li>
+          <li>Real-time chat (file-based at <code>.agency/orchestrator/chat.txt</code>)</li>
+          <li>Pyodide Python runtime in-browser</li>
+          <li>Multi-agent instances (Elves + Bots)</li>
+          <li>OPFS persistent storage, snapshot/restore, export/import</li>
+          <li>LLM backends: Gemini, Ollama, LM Studio, local Transformers.js</li>
+        </ul>
+        <h4>Open work</h4>
+        <ul>
+          <li>Mode 2 nested shell impl</li>
+          <li>Mode 3 isolated runtime</li>
+          <li>Tighter <code>.elf</code> integration: bake completed Codelves session as a <code>.elf</code> archive (project state + replay UI)</li>
+        </ul>
+        <a href="plans/codelves.md" class="plan-link" target="_blank" rel="noopener">Read full plan →</a>
+      </div>
+    </details>
+  </section>
+</div>
+
+<!-- ════ WEBELVES TAB ════ -->
+<div class="tab-content" id="tab-webelves">
+  <section>
+    <div class="section-label">Webelves — Local search</div>
+    <h2>Perplexity, <span class="h2-sky">offline.</span></h2>
+    <p class="lede">A static, browser-native Perplexity-style search engine. All inference runs client-side via wllama (llama.cpp compiled to WASM+SIMD). The AI is called <strong>QAi</strong> — it reads the web, grounds answers in real sources, cites them inline.</p>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-num sky">[01]</div>
+        <div class="card-title">Single engine, many tabs</div>
+        <div class="card-desc">One wllama Worker runs in the page. Every tab shares it. A small <code>runExclusive</code> queue guarantees one completion at a time. Non-active tabs with pending work show a "waiting" badge.</div>
+      </div>
+      <div class="card">
+        <div class="card-num sky">[02]</div>
+        <div class="card-title">Pluggable search</div>
+        <div class="card-desc"><code>SearchAdapter</code> is a 2-method interface (<code>search</code>, <code>fetchPage</code>). <code>SearXNGAdapter</code> ships. <code>CORSProxyAdapter</code> + <code>ExtensionAdapter</code> stubs planned for v1.5.</div>
+      </div>
+      <div class="card">
+        <div class="card-num sky">[03]</div>
+        <div class="card-title">Grounded answers</div>
+        <div class="card-desc">Top 4 pages fetched → Readability-extracted → chunked → MiniLM-embedded → cosine-ranked → top 5 chunks feed a "cite as <code>[N]</code>" prompt. Citations become clickable chips that scroll the source card into view.</div>
+      </div>
+      <div class="card">
+        <div class="card-num sky">[04]</div>
+        <div class="card-title">Memory, transparent</div>
+        <div class="card-desc">After each chat (not search), the model extracts 0–3 durable facts. Stored in OPFS <code>memories.json</code>. All memories visible / editable / wipeable in Settings → Memory.</div>
+      </div>
+    </div>
+
+    <details class="plan-block">
+      <summary>The plan — v1 → v1.5</summary>
+      <div class="plan-content">
+        <h4>Stack</h4>
+        <ul>
+          <li>Vite + React 18 + TypeScript + Tailwind</li>
+          <li>Zustand (tabs, sessions, generation queue)</li>
+          <li>react-resizable-panels (QAi side panel)</li>
+          <li>@wllama/wllama (GGUF runtime, Web Worker, WASM v1)</li>
+          <li>@xenova/transformers (MiniLM-L6-v2 embeddings, separate worker)</li>
+          <li>@mozilla/readability (main-text extraction)</li>
+        </ul>
+        <h4>Model slots</h4>
+        <ul>
+          <li><strong>Default</strong> — SmolLM2-360M-Instruct Q4_K_M (~230MB)</li>
+          <li><strong>Quality</strong> — Gemma-3-1B-Instruct Q4_K_M (~800MB, split into ≤512MB chunks)</li>
+        </ul>
+        <h4>COOP/COEP</h4>
+        <ul>
+          <li>wllama multi-threading needs cross-origin-isolated context</li>
+          <li><code>public/_headers</code> sets <code>Cross-Origin-Opener-Policy: same-origin</code> + <code>Cross-Origin-Embedder-Policy: require-corp</code></li>
+          <li>Without those, wllama silently drops to single-thread</li>
+        </ul>
+        <h4>Not in v1</h4>
+        <ul>
+          <li>WebGPU / WebLLM path (wllama roadmap, stubbed)</li>
+          <li>Extensions / CORS-proxy adapters (interfaces in)</li>
+          <li>Fine-tuning / LoRAs — personalization is retrieval-only</li>
+          <li>Accounts, sync, mobile layout polish</li>
+        </ul>
+        <a href="plans/webelves.md" class="plan-link" target="_blank" rel="noopener">Read full plan →</a>
+      </div>
+    </details>
+  </section>
+</div>
+
+<!-- ════ FOUNDRY TAB ════ -->
+<div class="tab-content" id="tab-foundry">
+  <section>
+    <div class="section-label">Foundry — Python GAN · paid tier</div>
+    <h2>Bootstrap the <span class="h2-rose">wiki brain.</span></h2>
+    <p class="lede">A Python pipeline that synthesizes <code style="color:var(--teal);">.elf</code> artifacts at scale, scores each one with a discriminator, and accumulates the high-scoring subset as a fine-tuning corpus. Goal: a 1–3B model that emits valid <code style="color:var(--teal);">.elf</code> content offline, in-browser.</p>
+
+    <div class="pipeline">
+      <div class="pipe-row" style="margin-top:8px;">
+        <span class="pipe-node in">seeds.yaml</span>
+        <span class="pipe-arr">→</span>
+        <span class="pipe-node">generator</span>
+        <span class="pipe-arr">→</span>
+        <span class="pipe-node">candidate.elf</span>
+        <span class="pipe-arr">→</span>
+        <span class="pipe-node disc">discriminator</span>
+        <span class="pipe-arr">→</span>
+        <span class="pipe-node">verdict</span>
+      </div>
+      <div class="pipe-row" style="color:var(--ink-faint);">
+        <span style="padding-left:60px;">↑ refinement loop ←──── critique ←────┘</span>
+      </div>
+      <div class="pipe-row" style="margin-top:8px;">
+        <span class="pipe-node">accepted</span>
+        <span class="pipe-arr">→</span>
+        <span class="pipe-node out">wiki-brain.jsonl</span>
+        <span class="pipe-arr">→</span>
+        <span class="pipe-node">fine-tune</span>
+        <span class="pipe-arr">→</span>
+        <span class="pipe-node out">in-browser .elf-emitter</span>
+      </div>
+    </div>
+
+    <div class="terminal" style="margin-top:24px;">
+      <div><span class="t-comment"># with key — full pipeline</span></div>
+      <div><span class="t-cmd">foundry</span> <span class="t-arg">loop</span> --seeds seeds/topics.yaml --workers 4</div>
+      <div style="margin-top:6px;"><span class="t-comment"># offline — stub generator + heuristic discriminator</span></div>
+      <div><span class="t-cmd">foundry</span> <span class="t-arg">loop</span> --offline --seeds seeds/topics.yaml</div>
+    </div>
+
+    <details class="plan-block">
+      <summary>The plan — Foundry phases</summary>
+      <div class="plan-content">
+        <h4>Hard constraints</h4>
+        <ul>
+          <li>Python only. No Node deps in the runtime.</li>
+          <li>Offline-first. Every external call gated by <code>ELF_LLM_API_KEY</code>. Absence = local fallback. Never crash.</li>
+          <li>Discriminator only judges what its phase produces — no scoring features for unbuilt content.</li>
+          <li>Key-input scaffolded today, dormant. Paid features wired behind the same slot when they ship.</li>
+        </ul>
+        <h4>Phases</h4>
+        <table class="phase-table">
+          <tr><th>Phase</th><th>Goal</th><th>Status</th></tr>
+          <tr><td class="phase-num">0</td><td>Landing page (this site, product tabs, plan links)</td><td class="status-progress">in progress</td></tr>
+          <tr><td class="phase-num">1</td><td>Foundry scaffold — <code>pyproject.toml</code> + <code>foundry/{config,cli}.py</code></td><td class="status-todo">not started</td></tr>
+          <tr><td class="phase-num">2</td><td>Inspector + Python builder (re-impl of forge <code>buildSingle</code>)</td><td class="status-todo">not started</td></tr>
+          <tr><td class="phase-num">3</td><td>Discriminator — Playwright + depth/size + LLM judge</td><td class="status-todo">not started</td></tr>
+          <tr><td class="phase-num">4</td><td>Generator + GAN refinement loop</td><td class="status-todo">not started</td></tr>
+          <tr><td class="phase-num">5</td><td>Fine-tune target — wiki-brain JSONL → in-browser <code>.gguf</code></td><td class="status-todo">not started</td></tr>
+        </table>
+        <h4>Discriminator rubric</h4>
+        <ul>
+          <li>Functionality (Playwright runtime checks) — weight 0.5, hard fail if model never loads</li>
+          <li>Depth (corpus tokens × tool count, log-scaled) — weight 0.3, capped to avoid rewarding bloat</li>
+          <li>Size efficiency (depth_score / log(bytes)) — weight 0.2, penalizes &gt; 50MB unless depth justifies</li>
+          <li>Composite — accept if ≥ 0.7 AND functionality ≥ 0.6. LLM judge can veto.</li>
+        </ul>
+        <a href="plans/foundry.md" class="plan-link" target="_blank" rel="noopener">Read full plan →</a>
+      </div>
+    </details>
+
+    <div class="key-input">
+      <div class="key-input-label">⚡ Optional — bring your own key</div>
+      <h3>Run Foundry online with your API key.</h3>
+      <p>Today: input is stored in your browser only and isn't wired to anything yet — Foundry's CLI hasn't shipped Phase 1. When it does, this same key flows through <code>ELF_LLM_API_KEY</code> for online generation + Claude judge. Leave blank for offline mode.</p>
+      <div class="key-input-row">
+        <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
+        <button class="btn-disabled" onclick="saveKeyStub()">Save</button>
+      </div>
+      <p class="key-input-note">Stored in <code>localStorage</code>. Wipe via Settings (when shipped) or browser devtools.</p>
+    </div>
+
+    <div class="waitlist">
+      <div class="waitlist-label">Early access</div>
+      <h3>Get notified when Phase 1 ships.</h3>
+      <div class="waitlist-row">
+        <input type="email" id="emailInput" placeholder="you@domain.com">
+        <button class="btn-paid" onclick="joinWaitlist()">Join waitlist</button>
+      </div>
+      <p class="waitlist-note">No spam. One email when Foundry's CLI lands.</p>
+    </div>
+  </section>
+</div>
+
+<!-- ════ FOOTER ════ -->
+<footer>
+  <span><span class="footer-logo">// elf</span> — Embedded Language Format</span>
+  <span>
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener">CC BY-NC-SA 4.0</a>
+    — share alike, non-commercial, with attribution
+  </span>
+  <a href="PLAN.md" target="_blank" rel="noopener">Active plan ↗</a>
+</footer>
+
+<!-- toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── TAB SWITCHING ────────────────────────────────────────────────────────────
+function switchTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  const target = document.getElementById('tab-'+tab);
+  if(target) target.classList.add('active');
+  const btn = document.querySelector(`[data-tab="${tab}"]`);
+  if(btn) btn.classList.add('active');
+  if(history.replaceState){
+    history.replaceState(null,'','#'+tab);
+  }
+  window.scrollTo({top:0, behavior:'instant'});
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// initial tab from hash
+window.addEventListener('DOMContentLoaded', () => {
+  const hash = window.location.hash.replace('#','');
+  const valid = ['overview','forge','notebookelf','codelves','webelves','foundry'];
+  if(valid.includes(hash)) switchTab(hash);
+});
+
+// ── TOAST ────────────────────────────────────────────────────────────────────
+function showToast(msg, accent){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderColor = accent || 'var(--teal)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// ── KEY (stub) ──────────────────────────────────────────────────────────────
+function saveKeyStub(){
+  const v = document.getElementById('apiKeyInput').value.trim();
+  if(!v){ showToast('Enter a key first', 'var(--rose)'); return; }
+  // Stored in localStorage; not wired to any backend yet.
+  localStorage.setItem('elf.api_key', v);
+  document.getElementById('apiKeyInput').value = '';
+  showToast('Key stored locally. Phase 1 of Foundry will pick this up.', 'var(--rose)');
+}
+
+// ── WAITLIST ─────────────────────────────────────────────────────────────────
+function joinWaitlist(){
+  const email = document.getElementById('emailInput').value.trim();
+  if(!email || !email.includes('@')){ showToast('Enter a valid email', 'var(--rose)'); return; }
+  // No backend yet — store locally so we don't lose interest.
+  const list = JSON.parse(localStorage.getItem('elf.waitlist') || '[]');
+  if(!list.includes(email)) list.push(email);
+  localStorage.setItem('elf.waitlist', JSON.stringify(list));
+  document.getElementById('emailInput').value = '';
+  showToast('You\'re on the list. We\'ll be in touch.', 'var(--teal)');
+}
+</script>
+</body>
+</html>
